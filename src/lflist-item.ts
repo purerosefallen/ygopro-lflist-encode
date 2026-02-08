@@ -1,4 +1,5 @@
 import { YGOProDeckLike } from 'ygopro-deck-encode';
+import { YGOProLFListError, YGOProLFListErrorReason } from './lflist-error';
 
 export interface YGOProLFListEntry {
   code: number;
@@ -17,32 +18,6 @@ export interface YGOProLFListCreditLimit {
   limit: number;
   comment?: string;
   entries: YGOProLFListCreditLimitEntry[];
-}
-
-export enum YGOProLFListErrorReason {
-  LFLIST = 0x1,
-  OCGONLY = 0x2,
-  TCGONLY = 0x3,
-  UNKNOWNCARD = 0x4,
-  CARDCOUNT = 0x5,
-  MAINCOUNT = 0x6,
-  EXTRACOUNT = 0x7,
-  SIDECOUNT = 0x8,
-  NOTAVAIL = 0x9,
-}
-
-export class YGOProLFListError {
-  reason: YGOProLFListErrorReason;
-  code: number;
-
-  constructor(reason: YGOProLFListErrorReason, code: number = 0) {
-    this.reason = reason;
-    this.code = code >>> 0;
-  }
-
-  toPayload() {
-    return (((this.reason & 0xf) << 28) | (this.code & 0x0fffffff)) >>> 0;
-  }
 }
 
 export class YGOProLFListItem {
@@ -268,5 +243,50 @@ export class YGOProLFListItem {
       hash = (hash ^ a ^ b) >>> 0;
     }
     return hash >>> 0;
+  }
+
+  merge(...items: YGOProLFListItem[]) {
+    const all = [this, ...items];
+    const mergedEntries = new Map<number, YGOProLFListEntry>();
+    const mergedCredits: YGOProLFListCreditLimit[] = [];
+    const usedIdentifiers = new Map<string, number>();
+
+    const reserveIdentifier = (identifier: string) => {
+      if (!usedIdentifiers.has(identifier)) {
+        usedIdentifiers.set(identifier, 0);
+        return identifier;
+      }
+      let index = usedIdentifiers.get(identifier) ?? 0;
+      let candidate = `${identifier}_${index}`;
+      while (usedIdentifiers.has(candidate)) {
+        index += 1;
+        candidate = `${identifier}_${index}`;
+      }
+      usedIdentifiers.set(identifier, index + 1);
+      usedIdentifiers.set(candidate, 0);
+      return candidate;
+    };
+
+    for (const item of all) {
+      for (const entry of item.entries) {
+        const existing = mergedEntries.get(entry.code);
+        if (!existing || entry.limit < existing.limit) {
+          mergedEntries.set(entry.code, { ...entry });
+        }
+      }
+      for (const credit of item.creditLimits) {
+        const identifier = reserveIdentifier(credit.identifier);
+        mergedCredits.push({
+          identifier,
+          limit: credit.limit,
+          comment: credit.comment,
+          entries: credit.entries.map((entry) => ({ ...entry })),
+        });
+      }
+    }
+
+    this.entries = Array.from(mergedEntries.values());
+    this.creditLimits = mergedCredits;
+    return this;
   }
 }
