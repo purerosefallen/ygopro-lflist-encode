@@ -1,7 +1,7 @@
 {
   "name": "ygopro-lflist-encode",
   "description": "YGOPro lflist reader/encoder in JS/TS",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
