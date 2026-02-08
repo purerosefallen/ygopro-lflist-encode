@@ -11,4 +11,6 @@ npm install --save-dev \
 	prettier \
 	jest \
 	@types/jest \
-	ts-jest 
+	ts-jest \
+	esbuild \
+	esbuild-register
